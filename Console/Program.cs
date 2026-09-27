@@ -24,21 +24,28 @@ logger.Log(ILogger.Level.Info,
     "Welcome to the Enjoy life Scrapper. A CLI that scrapes JW.ORG and gets enjoy life videos to download in bulk",
     ILogger.Options.Bold);
 
-Dictionary<string, Dictionary<string, string>>? config = await configuration.GetConfig(configFile);
+Dictionary<string, string>? config = await configuration.GetConfig(configFile);
 if (config is null) return;
 logger.Log(ILogger.Level.Info, "Config Found");
 
 // Ask the user to select the Language and get from config
 string language = logger.Prompt("Select The Language:", config.Keys);
-Dictionary<string, string> sectionUrls = config[language];
+Dictionary<string, string> sectionUrls =
+    Enumerable.Range(1, 4)
+        .ToDictionary(
+            i => $"Section {i}",
+            i => string.Format(config[language], i)
+        );
 
 // Make the first requests to get the **html** for each section
 logger.Log(ILogger.Level.Info, "Starting to Scrape the HTML", ILogger.Options.Bold);
+// logger.Log(ILogger.Level.Info, "Starting to Scrape the HTML");
 Dictionary<string, List<string>> jsonUrls = await logger.WithProgress("HTML Progress:",
     async action => await webScraper.ScrapeJsonUrlsFromSections(sectionUrls, action));
 
 // Make the second batch of request to get all the API JSON Links
-logger.Log(ILogger.Level.Info, "Starting to Scrape the JSON", ILogger.Options.Bold);
+// logger.Log(ILogger.Level.Info, "Starting to Scrape the JSON", ILogger.Options.Bold);
+logger.Log(ILogger.Level.Info, "Starting to Scrape the JSON");
 Dictionary<string, List<JsonResponse>> jsonResponseFromUrls = await logger.WithProgress("JSON Progress:",
     async action => await webScraper.ScrapeJsonResponseFromUrls(jsonUrls, action));
 
@@ -53,6 +60,68 @@ string resolution = GenerateResolution();
 string targetDir = GenerateTargetDirectory();
 IWebScraper.DownloadFileNameType downloadFileNameType = GenerateDownloadFileNameType();
 IWebScraper.DownloadFilePathType downloadFilePathType = GenerateDownloadFilePathType();
+
+// Ask the user to scan folder to filter existing downloads
+string scanFolderPrompt = logger.Prompt("Do you want to scan a folder to skip already downloaded files? (y/n)", true);
+if (scanFolderPrompt.Equals("y", StringComparison.OrdinalIgnoreCase))
+{
+    string folder = logger.Prompt("Enter the folder path to scan:", false);
+
+    if (!Directory.Exists(folder))
+    {
+        logger.Log(
+            ILogger.Level.Error,
+            $"Folder does not exist: {folder}. Proceeding without filtering."
+        );
+    }
+    else
+    {
+        HashSet<string> existingFileNames = Directory
+            .EnumerateFiles(folder, "*.mp4", SearchOption.AllDirectories)
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(name => name is not null)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase)!;
+
+        if (existingFileNames.Count == 0)
+        {
+            logger.Log(ILogger.Level.Info, "No existing video files found in directory.");
+        }
+        else
+        {
+            logger.Log(ILogger.Level.Info, $"Found {existingFileNames.Count} existing video file(s). Filtering download queue...");
+
+            // Filter out items that match already downloaded filenames
+            Dictionary<string, List<JsonResponse>> filteredSections = new();
+            int skippedCount = 0;
+
+            foreach (var (section, responses) in customSectionUrls)
+            {
+                List<JsonResponse> remaining = responses.Where(res =>
+                {
+                    // Match against Title, File Name or URL components
+                    string title = res.Pub ?? string.Empty;
+                    bool exists = existingFileNames.Any(existing => existing.Contains(title, StringComparison.OrdinalIgnoreCase));
+                    if (exists) skippedCount++;
+                    return !exists;
+                }).ToList();
+
+                if (remaining.Count > 0)
+                {
+                    filteredSections[section] = remaining;
+                }
+            }
+
+            customSectionUrls = filteredSections;
+            logger.Log(ILogger.Level.Info, $"Skipped {skippedCount} file(s) that already exist in the target folder.");
+        }
+    }
+}
+
+if (customSectionUrls.Count == 0 || customSectionUrls.Values.All(list => list.Count == 0))
+{
+    logger.Log(ILogger.Level.Info, "All files are already downloaded or no files remain to download.");
+    return;
+}
 
 // Write or stream to the files
 logger.Log(ILogger.Level.Info, "Starting to Download the Files");
