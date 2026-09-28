@@ -49,7 +49,7 @@ logger.Log(ILogger.Level.Info, "Starting to Scrape the JSON");
 Dictionary<string, List<JsonResponse>> jsonResponseFromUrls = await logger.WithProgress("JSON Progress:",
     async action => await webScraper.ScrapeJsonResponseFromUrls(jsonUrls, action));
 
-string selectedSections = logger.Prompt("Select the Section To be Downloaded:", ["All", .. jsonResponseFromUrls.Keys.Order()]);
+string selectedSections = logger.Prompt("Select the Section To be Downloaded:", ["All", ..jsonResponseFromUrls.Keys.Order()]);
 Dictionary<string, List<JsonResponse>> customSectionUrls = GetFromDictionary(jsonResponseFromUrls, selectedSections);
 
 // Some Metadata by getting the size by resolution, (3gp, 240, 360, 480, 720),

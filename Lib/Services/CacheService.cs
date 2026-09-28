@@ -10,7 +10,7 @@ public class CacheService : ICacheService
     private readonly ILogger _logger;
     private readonly IFileService _fileService;
 
-    public CacheService(string cacheDir, IFileService fileService,  IHttpClient client, ILogger logger)
+    public CacheService(string cacheDir, IFileService fileService, IHttpClient client, ILogger logger)
     {
         _cacheDir = cacheDir;
         _fileService = fileService;
@@ -96,7 +96,7 @@ public class CacheService : ICacheService
         }
         catch (Exception exception)
         {
-            _logger.Log(ILogger.Level.Error,$"Exception: {exception.Message}");
+            _logger.Log(ILogger.Level.Error, $"Exception: {exception.Message}");
         }
     }
 }
