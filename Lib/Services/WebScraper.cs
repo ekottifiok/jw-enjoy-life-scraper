@@ -59,7 +59,7 @@ public async Task<Dictionary<string, List<JsonResponse>>> ScrapeJsonResponseFrom
 
 public async Task DownloadAllFiles(Dictionary<string, List<JsonResponse>> sectionUrls, string resolution,
     string targetDir, IWebScraper.DownloadFileNameType fileNameType, IWebScraper.DownloadFilePathType filePathType,
-    Action<decimal>? callback = null)
+    string? checkLocal, Action<decimal>? callback = null)
 {
     int allTasks = sectionUrls.Values.SelectMany(x => x).Count();
     int doneTask = 0;
@@ -79,6 +79,11 @@ public async Task DownloadAllFiles(Dictionary<string, List<JsonResponse>> sectio
                 string dir = filePathType == IWebScraper.DownloadFilePathType.Grouped
                     ? Path.Combine(targetDir, item.Key)
                     : targetDir;
+                if (checkLocal is not null)
+                {
+                    bool res = await cacheService.CopyIfExist(dir, fileName, checkLocal, resolution, token);
+                    if (res) { return; }
+                }
                 await cacheService.Download(dir, video.File.Url, fileName, video.FileSize, token);
             },
             (exception, video) =>
@@ -156,6 +161,6 @@ public interface IWebScraper
         Dictionary<string, List<string>> sectionUrls, Action<decimal>? callback = null);
 
     public Task DownloadAllFiles(Dictionary<string, List<JsonResponse>> sectionUrls, string resolution,
-        string targetDir, DownloadFileNameType fileNameType, DownloadFilePathType filePathType,
+        string targetDir, DownloadFileNameType fileNameType, DownloadFilePathType filePathType, string? checkLocal,
         Action<decimal>? callback = null);
 }

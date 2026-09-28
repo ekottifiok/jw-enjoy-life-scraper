@@ -8,6 +8,8 @@ const string cacheDir = ".cache";
 const string configFile = "config.json";
 const string downloadDir = "files";
 
+string? checkLocal = null;
+
 // TODO: Surround Everything in a try catch block
 ParallelOptions parallelOptions = new() { MaxDegreeOfParallelism = 8 };
 ConsoleLogger logger = new();
@@ -76,44 +78,50 @@ if (scanFolderPrompt.Equals("y", StringComparison.OrdinalIgnoreCase))
     }
     else
     {
-        HashSet<string> existingFileNames = Directory
-            .EnumerateFiles(folder, "*.mp4", SearchOption.AllDirectories)
-            .Select(Path.GetFileNameWithoutExtension)
-            .Where(name => name is not null)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase)!;
+        logger.Log(
+            ILogger.Level.Info,
+            $"Folder exist: {folder}. And would be scanned\nWould download files >{resolution}"
+        );
+        checkLocal = folder;
 
-        if (existingFileNames.Count == 0)
-        {
-            logger.Log(ILogger.Level.Info, "No existing video files found in directory.");
-        }
-        else
-        {
-            logger.Log(ILogger.Level.Info, $"Found {existingFileNames.Count} existing video file(s). Filtering download queue...");
+        // HashSet<string> existingFileNames = Directory
+        //     .EnumerateFiles(folder, "*.mp4", SearchOption.AllDirectories)
+        //     .Select(Path.GetFileNameWithoutExtension)
+        //     .Where(name => name is not null)
+        //     .ToHashSet(StringComparer.OrdinalIgnoreCase)!;
 
-            // Filter out items that match already downloaded filenames
-            Dictionary<string, List<JsonResponse>> filteredSections = new();
-            int skippedCount = 0;
+        // if (existingFileNames.Count == 0)
+        // {
+        //     logger.Log(ILogger.Level.Info, "No existing video files found in directory.");
+        // }
+        // else
+        // {
+        //     logger.Log(ILogger.Level.Info, $"Found {existingFileNames.Count} existing video file(s). Filtering download queue...");
 
-            foreach (var (section, responses) in customSectionUrls)
-            {
-                List<JsonResponse> remaining = responses.Where(res =>
-                {
-                    // Match against Title, File Name or URL components
-                    string title = res.Pub ?? string.Empty;
-                    bool exists = existingFileNames.Any(existing => existing.Contains(title, StringComparison.OrdinalIgnoreCase));
-                    if (exists) skippedCount++;
-                    return !exists;
-                }).ToList();
+        //     // Filter out items that match already downloaded filenames
+        //     Dictionary<string, List<JsonResponse>> filteredSections = new();
+        //     int skippedCount = 0;
 
-                if (remaining.Count > 0)
-                {
-                    filteredSections[section] = remaining;
-                }
-            }
+        //     foreach (var (section, responses) in customSectionUrls)
+        //     {
+        //         List<JsonResponse> remaining = responses.Where(res =>
+        //         {
+        //             // Match against Title, File Name or URL components
+        //             string title = res.Pub ?? string.Empty;
+        //             bool exists = existingFileNames.Any(existing => existing.Contains(title, StringComparison.OrdinalIgnoreCase));
+        //             if (exists) skippedCount++;
+        //             return !exists;
+        //         }).ToList();
 
-            customSectionUrls = filteredSections;
-            logger.Log(ILogger.Level.Info, $"Skipped {skippedCount} file(s) that already exist in the target folder.");
-        }
+        //         if (remaining.Count > 0)
+        //         {
+        //             filteredSections[section] = remaining;
+        //         }
+        //     }
+
+        //     customSectionUrls = filteredSections;
+        //     logger.Log(ILogger.Level.Info, $"Skipped {skippedCount} file(s) that already exist in the target folder.");
+        // }
     }
 }
 
@@ -127,8 +135,10 @@ if (customSectionUrls.Count == 0 || customSectionUrls.Values.All(list => list.Co
 logger.Log(ILogger.Level.Info, "Starting to Download the Files");
 await logger.WithProgress("Download Progress:", async action =>
 {
-    await webScraper.DownloadAllFiles(customSectionUrls, resolution, targetDir, downloadFileNameType,
-        downloadFilePathType, action);
+    await webScraper.DownloadAllFiles(
+        customSectionUrls, resolution,
+        targetDir, downloadFileNameType,
+        downloadFilePathType, checkLocal, action);
     return Task.CurrentId;
 });
 return;
