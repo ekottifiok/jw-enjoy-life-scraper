@@ -105,9 +105,7 @@ public partial class CacheService : ICacheService
     {
         string sFilename = Helper.SanitizeFileName(filename);
         string src = Path.Combine(localPath, sFilename);
-        string[] exist = Directory
-    .GetFiles(localPath, allResolutionRegex().Replace(sFilename, "*"))
-    ;
+        string[] exist = Directory.GetFiles(localPath, allResolutionRegex().Replace(sFilename, "*"));
         if (exist.Length == 0) { return false; }
 
         string? selectedFile = exist
